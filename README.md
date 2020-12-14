@@ -1,3 +1,7 @@
+# Этот проект склонирован у Alex Gyver. Оригинальный проект находится по ссылке: https://github.com/AlexGyver/GyverLamp
+
+
+
 ![PROJECT_PHOTO](https://github.com/AlexGyver/GyverLamp/blob/master/proj_img.jpg)
 # Крутая WiFi лампа на esp8266 своими руками
 * [Описание проекта](#chapter-0)
