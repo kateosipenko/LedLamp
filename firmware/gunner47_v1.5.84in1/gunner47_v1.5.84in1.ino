@@ -279,6 +279,10 @@
 #include "TimerManager.h"
 #include "FavoritesManager.h"
 #include "EepromManager.h"
+
+#include <RemoteMe.h>
+#include <RemoteMeSocketConnector.h>
+
 #ifdef USE_BLYNK
 #include <BlynkSimpleEsp8266.h>
 #endif
@@ -363,7 +367,7 @@ uint32_t eepromTimeout;
 bool settChanged = false;
 bool buttonEnabled = true;
 
-unsigned char matrixValue[8][16]; //это массив для эффекта Огонь
+unsigned char matrixValue[8][29]; //это массив для эффекта Огонь
 
 bool TimerManager::TimerRunning = false;
 bool TimerManager::TimerHasFired = false;
@@ -378,6 +382,160 @@ uint8_t FavoritesManager::FavoriteModes[MODE_AMOUNT] = {0};
 uint32_t FavoritesManager::nextModeAt = 0UL;
 
 bool CaptivePortalManager::captivePortalCalled = false;
+
+// --- REMOTE ME ORG ------------------
+
+RemoteMe& remoteMe = RemoteMe::getInstance(TOKEN, DEVICE_ID);
+
+
+//*************** CODE FOR COMFORTABLE VARIABLE SET *********************
+
+inline void setGarlandMode(String s) {remoteMe.getVariables()->setText("garlandMode", s); }
+
+inline void setGarlandBrightness(int32_t i) {remoteMe.getVariables()->setInteger("garlandBrightness", i); }
+
+inline void setGarlandPower(boolean b) {remoteMe.getVariables()->setBoolean("garlandPower", b); }
+
+//*************** IMPLEMENT FUNCTIONS BELOW *********************
+
+void onGarlandPowerChange(boolean b) {
+  FastLED.clear();
+  delay(2);
+  FastLED.show();
+  ONflag = b;
+  changePower();
+}
+
+void onGarlandBrightnessChange(int32_t i) {
+  modes[currentMode].Brightness = i;
+  FastLED.setBrightness(modes[currentMode].Brightness);
+
+  #ifdef GENERAL_DEBUG
+  LOG.printf_P(PSTR("Новое значение яркости: %d\n"), modes[currentMode].Brightness);
+  #endif
+}
+
+void onGarlandModeChange(String s) {
+  LOG.println("NEW MODE ");
+  LOG.print(s);
+
+  if (s.equalsIgnoreCase("update")) {
+   #ifdef OTA
+
+    LOG.println("CHECK ESP MODE");
+    if (espMode == 0U) {
+      espMode = 1U;
+      EepromManager::SaveEspMode(&espMode);
+
+      #ifdef GENERAL_DEBUG
+      LOG.printf_P(PSTR("Рабочий режим лампы изменён и сохранён в энергонезависимую память\nНовый рабочий режим: ESP_MODE = %d, %s\nРестарт...\n"),
+        espMode, espMode == 0U ? F("WiFi точка доступа") : F("WiFi клиент (подключение к роутеру)"));
+      delay(1000);
+      #endif
+
+      showWarning(CRGB::Red, 3000U, 500U);                    // мигание красным цветом 3 секунды - смена рабочего режима лампы, перезагрузка
+      ESP.restart();
+    }
+   
+    LOG.println("REQUEST UPDATE 1");
+    if (otaManager.RequestOtaUpdate())
+    {
+      LOG.println("UPDATE 1");
+      ONflag = true;
+      currentMode = EFF_MATRIX;                             // принудительное включение режима "Матрица" для индикации перехода в режим обновления по воздуху
+      FastLED.clear();
+      delay(1);
+      changePower();
+    } else {
+      delay (2000);
+      LOG.println("REQUEST UPDATE 2");
+      if (otaManager.RequestOtaUpdate())
+      {
+        LOG.println("UPDATE 2");
+        ONflag = true;
+        currentMode = EFF_MATRIX;                             // принудительное включение режима "Матрица" для индикации перехода в режим обновления по воздуху
+        FastLED.clear();
+        delay(1);
+        changePower();
+      }
+      LOG.println("UPDATE FAILED");
+    }
+    #endif
+  } else if (s.equalsIgnoreCase("sparkles")) {
+    currentMode = EFF_SPARKLES;  
+  } else if (s.equalsIgnoreCase("fire")) {
+    currentMode = EFF_FIRE;  
+  } else if (s.equalsIgnoreCase("rainbow vertical")) {
+    currentMode = EFF_RAINBOW_VER;  
+  } else if (s.equalsIgnoreCase("rainbow horizontal")) {
+    currentMode = EFF_RAINBOW_HOR;  
+  } else if (s.equalsIgnoreCase("rainbow diagonal")) {
+    currentMode = EFF_RAINBOW_DIAG;  
+  } else if (s.equalsIgnoreCase("colors")) {
+    currentMode = EFF_COLORS;  
+  } else if (s.equalsIgnoreCase("madness")) {
+    currentMode = EFF_MADNESS;  
+  } else if (s.equalsIgnoreCase("clouds")) {
+    currentMode = EFF_CLOUDS;  
+  } else if (s.equalsIgnoreCase("lava")) {
+    currentMode = EFF_LAVA;  
+  } else if (s.equalsIgnoreCase("plasma")) {
+    currentMode = EFF_PLASMA;  
+  } else if (s.equalsIgnoreCase("rainbow")) {
+    currentMode = EFF_RAINBOW;  
+  } else if (s.equalsIgnoreCase("rainbow stripe")) {
+    currentMode = EFF_RAINBOW_STRIPE;  
+  } else if (s.equalsIgnoreCase("zebra")) {
+    currentMode = EFF_ZEBRA;  
+  } else if (s.equalsIgnoreCase("forest")) {
+    currentMode = EFF_FOREST;  
+  } else if (s.equalsIgnoreCase("ocean")) {
+    currentMode = EFF_OCEAN;
+  } else if (s.equalsIgnoreCase("color")) {
+    currentMode = EFF_COLOR;
+  } else if (s.equalsIgnoreCase("snow")) {
+    currentMode = EFF_SNOW;
+  } else if (s.equalsIgnoreCase("snow storm")) {
+    currentMode = EFF_SNOWSTORM;
+  } else if (s.equalsIgnoreCase("starfall")) {
+    currentMode = EFF_STARFALL;
+  } else if (s.equalsIgnoreCase("matrix")) {
+    currentMode = EFF_MATRIX;
+  } else if (s.equalsIgnoreCase("lighters")) {
+    currentMode = EFF_LIGHTERS;
+  } else if (s.equalsIgnoreCase("lighters traces")) {
+    currentMode = EFF_LIGHTER_TRACES;
+  } else if (s.equalsIgnoreCase("paintball")) {
+    currentMode = EFF_PAINTBALL;
+  } else if (s.equalsIgnoreCase("cube")) {
+    currentMode = EFF_CUBE;
+  } else if (s.equalsIgnoreCase("white color")) {
+    currentMode = EFF_WHITE_COLOR;
+  } else {
+    currentMode = EFF_SPARKLES;
+  }
+  
+  FastLED.setBrightness(modes[currentMode].Brightness);
+  loadingFlag = true;
+  settChanged = true;
+  eepromTimeout = millis();
+}
+
+// method will be called when user message came
+
+void onUserMessage(uint16_t senderDeviceId, uint16_t dataSize, uint8_t *data) {
+}
+
+// this method will be called when sync message came to arduino You have to fill  returnData and returnDataSize
+// as example now it reponse  one byte with 1 as value
+
+void onUserSyncMessage(uint16_t senderDeviceId, uint16_t dataSize, uint8_t* data, uint16_t &returnDataSize, uint8_t *&returnData) {
+  returnDataSize = 1;
+  returnData = (uint8_t*)malloc(returnDataSize);
+  returnData[0]=1;
+}
+
+// --- REMOTE ME ORG ------------------
 
 char* TextTicker;
 int Painting = 0; CRGB DriwingColor = CRGB(255, 255, 255);
@@ -436,7 +594,17 @@ void setup()
 
 
   // ЛЕНТА/МАТРИЦА
-  FastLED.addLeds<WS2812B, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS)/*.setCorrection(TypicalLEDStrip)*/;
+ 
+  FastLED.addLeds<WS2811, D6, COLOR_ORDER>(leds, 0, HEIGHT); // D1 // 5
+  FastLED.addLeds<WS2811, D3, COLOR_ORDER>(leds, HEIGHT, HEIGHT); // D2 //4
+  FastLED.addLeds<WS2811, D5, COLOR_ORDER>(leds, 2 * HEIGHT, HEIGHT); // D3 // 0
+  FastLED.addLeds<WS2811, D7, COLOR_ORDER>(leds, 3 * HEIGHT, HEIGHT); // D4 // 2
+  FastLED.addLeds<WS2811, D1, COLOR_ORDER>(leds, 4 * HEIGHT, HEIGHT); // D5 // 14
+  FastLED.addLeds<WS2811, D8, COLOR_ORDER>(leds, 5 * HEIGHT, HEIGHT); // D6 // 12
+  FastLED.addLeds<WS2811, D2, COLOR_ORDER>(leds, 6 * HEIGHT, HEIGHT); // D7 // 13
+  FastLED.addLeds<WS2811, D4, COLOR_ORDER>(leds, 7 * HEIGHT, HEIGHT); // D8 // 15
+//  
+  // FastLED.addLeds<WS2812B, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS)/*.setCorrection(TypicalLEDStrip)*/;
   //FastLED.addLeds<WS2812B, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(0xFFB0F0); // по предложению @kostyamat добавлена такая цветокоррекция "теперь можно получить практически чистый желтый цвет" и получилось плохо
   FastLED.setBrightness(BRIGHTNESS);
   if (CURRENT_LIMIT > 0)
@@ -561,6 +729,17 @@ void setup()
     LOG.print(F("IP адрес: "));
     LOG.println(WiFi.localIP());
 
+    // -- REMOTE ME ORG --------
+    LOG.println("INITIALIZING REMOTE");
+    remoteMe.getVariables()->observeText("garlandMode" ,onGarlandModeChange);
+    remoteMe.getVariables()->observeInteger("garlandBrightness" ,onGarlandBrightnessChange);
+    remoteMe.getVariables()->observeBoolean("garlandPower" ,onGarlandPowerChange);
+
+    remoteMe.setUserMessageListener(onUserMessage);
+    remoteMe.setUserSyncMessageListener(onUserSyncMessage);
+    remoteMe.setConnector(new RemoteMeSocketConnector());
+    remoteMe.sendRegisterDeviceMessage(DEVICE_NAME);
+
     #ifdef USE_BLYNK
     Blynk.config(USE_BLYNK);
     #endif
@@ -601,6 +780,7 @@ void setup()
 
 void loop()
 {
+  remoteMe.loop();
   parseUDP();
   if (Painting == 0) {
 
