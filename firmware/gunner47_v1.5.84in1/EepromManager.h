@@ -27,6 +27,11 @@
  * 24        1        признак первого запуска (определяет необходимость первоначальной записи всех хранимых настроек)
  * 25        1        время до "рассвета" (dawnMode)
  * 26        1        номер текущего эффекта лампы (currentMode)
+ * 
+ * ***************** RemoteMe.Org
+ * 30        1        on/off state from RemoteMe.org
+ * 31        1        currentMode from RemoteMe.org
+ * 32        1        brightness level from RemoteMe.org
  
  * ***************** массив modes (эффекты)
  * 50-52     3        режим №1:  яркость, скорость, масштаб (по одному байту)
@@ -68,6 +73,10 @@
 #define EEPROM_DAWN_MODE_ADDRESS             (25U)         // адрес в EEPROM памяти для записи времени до "рассвета"
 #define EEPROM_CURRENT_MODE_ADDRESS          (26U)         // адрес в EEPROM памяти для записи номера текущего эффекта лампы
 
+#define EEPROM_ON_OFF_REMOTE_ADDRESS         (30U)         // on/off state from RemoteME.org
+#define EEPROM_CURRENT_MODE_REMOTE_ADDRESS   (31U)         // current mode from REmoteMe.org
+#define EEPROM_BRIGHTNESS_REMOTE_ADDRESS     (32U)         // brightness level from RemoteMe.org
+
 #define EEPROM_ALARM_STRUCT_SIZE             (3U)           // 1 байт - вкл/выкл; 2 байта - время от начала суток в минутах (0 - 1440)
 #define EEPROM_ALARM_START_ADDRESS           (0U)           // начальный адрес в EEPROM памяти для записи настроек будильников
 
@@ -86,7 +95,8 @@
 class EepromManager
 {
   public:
-    static void InitEepromSettings(ModeType modes[], AlarmType alarms[], uint8_t* espMode, bool* onFlag, uint8_t* dawnMode, uint8_t* currentMode, bool* buttonEnabled,
+    static void InitEepromSettings(ModeType modes[], AlarmType alarms[], uint8_t* espMode, bool* onFlag, bool* onFlagRemote, uint8_t* dawnMode, uint8_t* currentMode,
+      uint8_t* currentModeRemote, uint8_t* brightnessRemote, bool* buttonEnabled,
       void (*readFavoritesSettings)(), void (*saveFavoritesSettings)(), void (*restoreDefaultSettings)())
     {
       EEPROM.begin(EEPROM_TOTAL_BYTES_USED);
@@ -144,8 +154,11 @@ class EepromManager
 #else
       *onFlag = (bool)EEPROM.read(EEPROM_LAMP_ON_ADDRESS);
 #endif
+      *onFlagRemote = (bool)EEPROM.read(EEPROM_ON_OFF_REMOTE_ADDRESS);
       *dawnMode = EEPROM.read(EEPROM_DAWN_MODE_ADDRESS);
       *currentMode = EEPROM.read(EEPROM_CURRENT_MODE_ADDRESS);
+      *currentModeRemote = EEPROM.read(EEPROM_CURRENT_MODE_REMOTE_ADDRESS);
+      *brightnessRemote = EEPROM.read(EEPROM_BRIGHTNESS_REMOTE_ADDRESS);
       *buttonEnabled = EEPROM.read(EEPROM_ESP_BUTTON_ENABLED_ADDRESS);
     }
 
@@ -155,18 +168,21 @@ class EepromManager
       EEPROM.commit();
     }
     
-    static void HandleEepromTick(bool* settChanged, uint32_t* eepromTimeout, bool* onFlag, uint8_t* currentMode, ModeType modes[], void (*saveFavoritesSettings)())
+    static void HandleEepromTick(bool* settChanged, uint32_t* eepromTimeout, bool* onFlag, bool* onFlagRemote, uint8_t* currentMode, uint8_t* currentModeRemote, uint8_t* brightnessLevelRemote, ModeType modes[], void (*saveFavoritesSettings)())
     {
       if (*settChanged && millis() - *eepromTimeout > EEPROM_WRITE_DELAY)
       {
         *settChanged = false;
         *eepromTimeout = millis();
         SaveOnFlag(onFlag);
+        SaveOnFlagRemote(onFlagRemote);
         SaveModesSettings(currentMode, modes);
         if (EEPROM.read(EEPROM_CURRENT_MODE_ADDRESS) != *currentMode)
         {
           EEPROM.write(EEPROM_CURRENT_MODE_ADDRESS, *currentMode);
         }
+        SaveCurrentModeRemote(currentModeRemote);
+        SaveBrightnessLevelRemote(brightnessLevelRemote);
         saveFavoritesSettings();
         EEPROM.commit();
       }
@@ -193,9 +209,27 @@ class EepromManager
 #endif
     }
 
+    static void SaveOnFlagRemote(bool* onFlagRemote)
+    {
+      EEPROM.write(EEPROM_ON_OFF_REMOTE_ADDRESS, *onFlagRemote);
+      EEPROM.commit();
+    }
+
     static void SaveDawnMode(uint8_t* dawnMode)
     {
       EEPROM.write(EEPROM_DAWN_MODE_ADDRESS, *dawnMode);
+      EEPROM.commit();
+    }
+
+    static void SaveCurrentModeRemote(uint8_t* currentModeRemote)
+    {
+      EEPROM.write(EEPROM_CURRENT_MODE_REMOTE_ADDRESS, *currentModeRemote);
+      EEPROM.commit();
+    }
+
+    static void SaveBrightnessLevelRemote(uint8_t* brightnessLevel)
+    {
+      EEPROM.write(EEPROM_BRIGHTNESS_REMOTE_ADDRESS, *brightnessLevel);
       EEPROM.commit();
     }
 

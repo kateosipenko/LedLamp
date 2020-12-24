@@ -361,8 +361,11 @@ uint32_t thisTime;
 bool manualOff = false;
 
 uint8_t currentMode = 0;
+uint8_t currentModeRemote = 0;
+uint8_t brightnessLevelRemote = 100;
 bool loadingFlag = true;
 bool ONflag = false;
+bool OnFlagRemote = false;
 uint32_t eepromTimeout;
 bool settChanged = false;
 bool buttonEnabled = true;
@@ -399,14 +402,24 @@ inline void setGarlandPower(boolean b) {remoteMe.getVariables()->setBoolean("gar
 //*************** IMPLEMENT FUNCTIONS BELOW *********************
 
 void onGarlandPowerChange(boolean b) {
+  if (OnFlagRemote == b) {
+    return;
+  }
+  
   FastLED.clear();
   delay(2);
   FastLED.show();
+  OnFlagRemote = b;
   ONflag = b;
   changePower();
 }
 
 void onGarlandBrightnessChange(int32_t i) {
+  if (brightnessLevelRemote == i) {
+    return;
+  }
+
+  brightnessLevelRemote = i;
   modes[currentMode].Brightness = i;
   FastLED.setBrightness(modes[currentMode].Brightness);
 
@@ -622,7 +635,7 @@ void setup()
 
   // EEPROM
   EepromManager::InitEepromSettings(                        // инициализация EEPROM; запись начального состояния настроек, если их там ещё нет; инициализация настроек лампы значениями из EEPROM
-    modes, alarms, &espMode, &ONflag, &dawnMode, &currentMode, &buttonEnabled,
+    modes, alarms, &espMode, &ONflag, &OnFlagRemote, &dawnMode, &currentMode, &currentModeRemote, &brightnessLevelRemote, &buttonEnabled,
     &(FavoritesManager::ReadFavoritesFromEeprom),
     &(FavoritesManager::SaveFavoritesToEeprom),
     &(restoreSettings)); // не придумал ничего лучше, чем делать восстановление настроек по умолчанию в обработчике инициализации EepromManager
@@ -633,7 +646,7 @@ void setup()
   wifiManager.setDebugOutput(WIFIMAN_DEBUG);                // вывод отладочных сообщений
   // wifiManager.setMinimumSignalQuality();                 // установка минимально приемлемого уровня сигнала WiFi сетей (8% по умолчанию)
   CaptivePortalManager *captivePortalManager = new CaptivePortalManager(&wifiManager);
-  if (espMode == 0U)                                        // режим WiFi точки доступа
+  if (false)                                        // режим WiFi точки доступа
   {
     // wifiManager.setConfigPortalBlocking(false);
 
@@ -786,8 +799,8 @@ void loop()
 
   effectsTick();
 
-  EepromManager::HandleEepromTick(&settChanged, &eepromTimeout, &ONflag, 
-    &currentMode, modes, &(FavoritesManager::SaveFavoritesToEeprom));
+  EepromManager::HandleEepromTick(&settChanged, &eepromTimeout, &ONflag, &OnFlagRemote,
+    &currentMode, &currentMode, &brightnessLevelRemote, modes, &(FavoritesManager::SaveFavoritesToEeprom));
 
   //#ifdef USE_NTP
   #if defined(USE_NTP) || defined(USE_MANUAL_TIME_SETTING)
